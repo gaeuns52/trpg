@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRPG</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f0f0; }
+        .hidden { display: none !important; }
+
+        /* 로비 */
+        #lobby { max-width: 420px; margin: 40px auto; padding: 28px; background: #fff; border-radius: 24px; border: 1px solid #ddd; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+        #lobby h2 { margin-bottom: 20px; font-size: 22px; }
+        .field-label { font-size: 13px; color: #555; margin-bottom: 4px; }
+        .field-group { margin-bottom: 14px; }
+        input[type=text], input[type=number], input[type=password] {
+            width: 100%; padding: 11px 14px; border: 1px solid #ddd; border-radius: 12px; background: #f9f9f9; font-size: 14px;
+        }
+        .btn { width: 100%; padding: 13px; border: none; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        .btn-black { background: #000; color: #fff; }
+        .btn-black:hover { background: #222; }
+
+        /* 방 목록 */
+        #room-list-container { margin-top: 16px; }
+        .room-item { margin-top: 10px; padding: 12px 14px; border: 1px solid #ddd; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .room-info { display: flex; flex-direction: column; gap: 3px; }
+        .room-title { font-weight: bold; font-size: 15px; }
+        .room-meta { font-size: 11px; color: #888; }
+        .join-btn { padding: 7px 14px; background: #000; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; }
+
+        /* 게임 룸 */
+        #game-room { display: flex; flex-direction: column; height: 100vh; max-width: 620px; margin: 0 auto; background: white; position: relative; }
+        .header { display: flex; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #eee; align-items: center; gap: 10px; }
+        .header-left { display: flex; flex-direction: column; gap: 2px; }
+        .header-location { font-weight: bold; font-size: 15px; }
+        .header-badge { font-size: 11px; color: #888; }
+        .spectator-badge { background: #f0f0f0; color: #555; padding: 3px 9px; border-radius: 20px; font-size: 12px; }
+
+        /* 채팅 */
+        #chat-box { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg-system { text-align: center; color: #999; font-size: 12px; padding: 2px 0; }
+        .msg-system-bold { text-align: center; color: #333; font-weight: bold; font-size: 13px; padding: 4px 0; }
+        .msg-container { display: flex; flex-direction: column; max-width: 75%; }
+        .msg-my { align-self: flex-end; align-items: flex-end; }
+        .msg-other { align-self: flex-start; align-items: flex-start; }
+        .msg-name { font-size: 11px; color: #888; margin-bottom: 3px; }
+        .chat-bubble { padding: 11px 15px; font-size: 14px; border-radius: 18px; line-height: 1.5; word-break: break-word; }
+        .msg-my .chat-bubble { background: #000; color: #fff; border-bottom-right-radius: 4px; }
+        .msg-other .chat-bubble { background: #e9e9eb; color: #000; border-bottom-left-radius: 4px; }
+
+        /* 입력창 */
+        .chat-input-row { display: flex; padding: 10px 14px; border-top: 1px solid #eee; gap: 8px; align-items: center; }
+        .chat-input-row input { flex: 1; height: 44px; padding: 0 15px; border: 1px solid #ddd; border-radius: 22px; font-size: 14px; }
+        .chat-input-row input:disabled { background: #f5f5f5; color: #aaa; }
+        #send-btn { width: 64px; height: 44px; background: #000; color: #fff; border: none; border-radius: 22px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        #send-btn:disabled { background: #ccc; cursor: default; }
+
+        /* 메뉴 패널 */
+        #menu-panel { position: absolute; top: 60px; right: 10px; width: 250px; background: #fff; border-radius: 20px; padding: 18px; z-index: 10; box-shadow: 0 10px 30px rgba(0,0,0,0.12); border: 1px solid #eee; max-height: 80vh; overflow-y: auto; }
+        #admin-help { display: none; font-size: 12px; border-bottom: 1px solid #eee; margin-bottom: 12px; padding-bottom: 10px; line-height: 1.8; }
+        .section-title { font-weight: bold; font-size: 13px; margin-bottom: 6px; }
+        .char-card { background: #f9f9f9; border: 1px solid #ddd; border-radius: 12px; padding: 10px; margin-bottom: 8px; }
+        .char-name { font-weight: bold; font-size: 14px; }
+        .char-stats { font-size: 12px; color: #555; margin-top: 3px; }
+        .badge-admin { background: #000; color: #fff; padding: 2px 6px; border-radius: 6px; font-size: 10px; margin-left: 6px; }
+        .badge-spectator { background: #eee; color: #555; padding: 2px 6px; border-radius: 6px; font-size: 10px; margin-left: 6px; }
+        .leave-btn { width: 100%; padding: 10px; background: #f5f5f5; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; margin-top: 10px; }
+        .leave-btn:hover { background: #eee; }
+    </style>
+</head>
+<body>
+
+<!-- 로비 -->
+<div id="lobby">
+    <h2>🎲 TRPG</h2>
+    <div class="field-group">
+        <div class="field-label">닉네임</div>
+        <input type="text" id="user-name" placeholder="닉네임 입력">
+    </div>
+    <div style="display:flex; gap:10px;">
+        <div class="field-group" style="flex:1">
+            <div class="field-label">체력</div>
+            <input type="number" id="init-hp" value="10" min="0" max="100">
+        </div>
+        <div class="field-group" style="flex:1">
+            <div class="field-label">정신력</div>
+            <input type="number" id="init-san" value="10" min="0" max="100">
+        </div>
+    </div>
+    <div class="field-group">
+        <div class="field-label">방 제목</div>
+        <input type="text" id="new-room-title" placeholder="새 방 제목">
+    </div>
+    <div class="field-group">
+        <div class="field-label">비밀번호 (없으면 공개방)</div>
+        <input type="password" id="new-room-pass" placeholder="비밀번호 (선택)">
+    </div>
+    <button class="btn btn-black" onclick="createRoom()">방 생성</button>
+    <div id="room-list-container"></div>
+</div>
+
+<!-- 게임 룸 -->
+<div id="game-room" class="hidden">
+    <div class="header">
+        <div class="header-left">
+            <div class="header-location">📍 <span id="map-box">로비</span></div>
+            <div class="header-badge" id="room-badge"></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span id="spectator-badge" class="spectator-badge hidden"></span>
+            <div onclick="toggleMenu()" style="cursor:pointer; font-size:22px; padding:4px;">☰</div>
+        </div>
+    </div>
+
+    <div id="menu-panel" class="hidden">
+        <div id="admin-help">
+            <b>📋 기본 명령어</b><br>
+            /강퇴 [이름]<br>
+            /아이템 [이름] 획득<br>
+            /[n층]<br>
+            /[이름] 체력 [수치]<br>
+            /[이름] 정신력 [수치]<br>
+            /[이름] 룰렛<br>
+            /조사 종료<br><br>
+            <b>📊 구글 시트 명령어</b><br>
+            <span id="sheet-cmds"></span>
+        </div>
+        <div class="section-title">👥 참여자</div>
+        <div id="character-container"></div>
+        <div style="margin-top:12px;">
+            <div class="section-title">📦 아이템</div>
+            <div id="item-list" style="font-size:13px; color:#444; margin-top:4px;">없음</div>
+        </div>
+        <hr style="margin:12px 0; border:none; border-top:1px solid #eee;">
+        <button class="leave-btn" onclick="leaveRoom()">방 나가기</button>
+    </div>
+
+    <div id="chat-box"></div>
+
+    <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="메시지 입력..." onkeypress="if(event.keyCode==13) sendChat()">
+        <button id="send-btn" onclick="sendChat()">전송</button>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+
+    let myNick = "";
+    let isAdmin = false;
+    let amSpectator = false;
+
+    function escapeHtml(str) {
+        if (typeof str !== 'string') return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    window.onload = () => {
+        const roomTitle = localStorage.getItem('roomTitle');
+        const nick = localStorage.getItem('nick');
+        const spectator = localStorage.getItem('isSpectator') === 'true';
+        if (roomTitle && nick) {
+            myNick = nick;
+            document.getElementById('user-name').value = nick;
+            socket.emit('rejoin_room', { title: roomTitle, name: nick, isSpectator: spectator });
+        }
+    };
+
+    function toggleMenu() {
+        document.getElementById('menu-panel').classList.toggle('hidden');
+    }
+
+    function leaveRoom() {
+        localStorage.removeItem('roomTitle');
+        localStorage.removeItem('nick');
+        localStorage.removeItem('isSpectator');
+        location.reload();
+    }
+
+    function createRoom() {
+        myNick = document.getElementById('user-name').value.trim();
+        const title = document.getElementById('new-room-title').value.trim();
+        const pass = document.getElementById('new-room-pass').value;
+        if (!myNick || !title) return alert("닉네임과 방 제목을 입력하세요!");
+        socket.emit('create_room', { title, password: pass, creatorName: myNick });
+        socket.once('create_success', (t) => joinRoom(t, pass));
+    }
+
+    function joinRoom(title, pass) {
+        myNick = document.getElementById('user-name').value.trim();
+        if (!myNick) return alert("닉네임을 먼저 입력하세요!");
+        socket.emit('join_room', {
+            title,
+            password: pass,
+            name: myNick,
+            hp: document.getElementById('init-hp').value,
+            san: document.getElementById('init-san').value
+        });
+    }
+
+    function handleJoinClick(title, hasPassword) {
+        myNick = document.getElementById('user-name').value.trim();
+        if (!myNick) return alert("닉네임을 먼저 입력하세요!");
+
+        if (hasPassword) {
+            const pass = prompt("비밀번호를 입력하세요:\n(비밀번호 없이 확인하면 관전자로 입장합니다)");
+            if (pass === null) return;
+            joinRoom(title, pass);
+        } else {
+            joinRoom(title, "");
+        }
+    }
+
+    function sendChat() {
+        if (amSpectator) return;
+        const input = document.getElementById('chat-input');
+        const val = input.value.trim();
+        if (!val) return;
+        socket.emit('msg_send', val);
+        input.value = '';
+    }
+
+    function appendMessage({ sender, text, type }) {
+        const box = document.getElementById('chat-box');
+
+        if (type === 'system') {
+            const parts = text.split('|');
+            if (parts.length > 1) {
+                const textDiv = document.createElement('div');
+                textDiv.className = 'msg-system-bold';
+                textDiv.textContent = parts[0].trim();
+                box.appendChild(textDiv);
+
+                const imgUrl = parts[1].trim();
+                const imgDiv = document.createElement('div');
+                imgDiv.style.cssText = 'text-align:center; margin:8px 0;';
+                const img = document.createElement('img');
+                img.src = imgUrl;
+                img.style.cssText = 'max-width:90%; border-radius:10px; cursor:pointer;';
+                img.onclick = () => window.open(imgUrl);
+                imgDiv.appendChild(img);
+                box.appendChild(imgDiv);
+            } else {
+                const div = document.createElement('div');
+                div.className = 'msg-system';
+                div.textContent = text;
+                box.appendChild(div);
+            }
+        } else {
+            const isMy = (sender === myNick);
+            const container = document.createElement('div');
+            container.className = `msg-container ${isMy ? 'msg-my' : 'msg-other'}`;
+            const nameEl = document.createElement('div');
+            nameEl.className = 'msg-name';
+            nameEl.textContent = sender;
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = text;
+            container.appendChild(nameEl);
+            container.appendChild(bubble);
+            box.appendChild(container);
+        }
+        box.scrollTop = box.scrollHeight;
+    }
+
+    // 소켓 이벤트
+    socket.on('join_success', (data) => {
+        localStorage.setItem('roomTitle', data.title);
+        localStorage.setItem('nick', myNick);
+        localStorage.setItem('isSpectator', data.isSpectator);
+
+        isAdmin = data.isAdmin;
+        amSpectator = data.isSpectator;
+
+        document.getElementById('lobby').classList.add('hidden');
+        document.getElementById('game-room').classList.remove('hidden');
+        document.getElementById('room-badge').textContent = data.title;
+
+        if (amSpectator) {
+            document.getElementById('spectator-badge').textContent = '👁 관전 중';
+            document.getElementById('spectator-badge').classList.remove('hidden');
+            document.getElementById('chat-input').disabled = true;
+            document.getElementById('chat-input').placeholder = '관전자는 채팅을 보낼 수 없습니다';
+            document.getElementById('send-btn').disabled = true;
+        }
+    });
+
+    socket.on('update_commands', (cmds) => {
+        if (!isAdmin) return;
+        const sheetHelp = document.getElementById('sheet-cmds');
+        sheetHelp.textContent = cmds.map(c => c.cmd).join('\n');
+        sheetHelp.style.whiteSpace = 'pre';
+        document.getElementById('admin-help').style.display = 'block';
+    });
+
+    socket.on('msg_receive', (data) => appendMessage(data));
+
+    socket.on('update_data', ({ characters, items, mapInfo, creatorName, spectatorCount }) => {
+        document.getElementById('map-box').textContent = mapInfo;
+
+        const container = document.getElementById('character-container');
+        container.innerHTML = '';
+        Object.entries(characters).forEach(([name, data]) => {
+            const isCreator = (name === creatorName);
+            const card = document.createElement('div');
+            card.className = 'char-card';
+
+            const nameRow = document.createElement('div');
+            nameRow.className = 'char-name';
+            nameRow.textContent = name;
+            if (isCreator) {
+                const badge = document.createElement('span');
+                badge.className = 'badge-admin';
+                badge.textContent = '방장';
+                nameRow.appendChild(badge);
+            }
+            card.appendChild(nameRow);
+
+            if (!isCreator) {
+                const stats = document.createElement('div');
+                stats.className = 'char-stats';
+                stats.textContent = `체력 ${data.hp} / 정신력 ${data.san}`;
+                card.appendChild(stats);
+            }
+            container.appendChild(card);
+        });
+
+        if (spectatorCount > 0) {
+            const spec = document.createElement('div');
+            spec.style.cssText = 'font-size:12px; color:#888; margin-top:4px;';
+            spec.textContent = `👁 관전자 ${spectatorCount}명`;
+            container.appendChild(spec);
+        }
+
+        document.getElementById('item-list').textContent = items.map(i => i.name).join(', ') || '없음';
+    });
+
+    socket.on('room_list', (list) => {
+        const container = document.getElementById('room-list-container');
+        container.innerHTML = '';
+        if (list.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:#aaa; font-size:13px; margin-top:16px;">생성된 방이 없습니다</div>';
+            return;
+        }
+        list.forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'room-item';
+
+            const info = document.createElement('div');
+            info.className = 'room-info';
+            const title = document.createElement('div');
+            title.className = 'room-title';
+            title.textContent = r.title + (r.hasPassword ? ' 🔒' : '');
+            const meta = document.createElement('div');
+            meta.className = 'room-meta';
+            meta.textContent = `플레이어 ${r.playerCount}명 · 관전자 ${r.spectatorCount}명`;
+            info.appendChild(title);
+            info.appendChild(meta);
+
+            const btn = document.createElement('button');
+            btn.className = 'join-btn';
+            btn.textContent = '입장';
+            btn.onclick = () => handleJoinClick(r.title, r.hasPassword);
+
+            div.appendChild(info);
+            div.appendChild(btn);
+            container.appendChild(div);
+        });
+    });
+
+    socket.on('system_alert', (msg) => alert(msg));
+
+    socket.on('room_closed', () => {
+        localStorage.removeItem('roomTitle');
+        localStorage.removeItem('nick');
+        localStorage.removeItem('isSpectator');
+        alert('방장이 퇴장하여 방이 종료되었습니다.');
+        location.reload();
+    });
+
+    socket.on('kick_user', () => {
+        localStorage.removeItem('roomTitle');
+        localStorage.removeItem('nick');
+        localStorage.removeItem('isSpectator');
+        alert('강퇴되었습니다.');
+        location.reload();
+    });
+
+    setInterval(() => socket.emit('get_room_list'), 2000);
+</script>
+</body>
+</html>
