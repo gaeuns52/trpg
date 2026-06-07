@@ -96,6 +96,38 @@
 
         /* 입력창 */
         #send-btn { width: 60px; height: 44px; background: #000; color: #fff; border: none; border-radius: 22px; cursor: pointer; font-weight: bold; }
+        #chat-input-area {
+    display: flex;
+    padding: 10px;
+    border-top: 1px solid #eee;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+#chat-input {
+    flex: 1;
+
+    min-height: 44px;
+    max-height: 120px;
+
+    padding: 10px 15px;
+
+    border: 1px solid #ddd;
+    border-radius: 18px;
+
+    resize: none;
+    overflow-y: auto;
+    overflow-wrap: break-word;
+    word-break: break-word;
+
+
+
+    font-size: 14px;
+    line-height: 1.4;
+
+    box-sizing: border-box;
+    margin: 0;
+}
 
         /* 조사 종료 결과 팝업 */
         .result-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
@@ -198,10 +230,11 @@
 
     <div id="chat-box"></div>
 
-    <div style="display:flex; padding:10px; border-top:1px solid #eee; gap:8px;">
-        <input type="text" id="chat-input" onkeypress="if(event.keyCode==13) sendChat()" style="flex:1; height:44px; padding:0 15px; border:1px solid #ddd; border-radius:22px; box-sizing:border-box; font-size:14px;">
-        <button id="send-btn" onclick="sendChat()">전송</button>
-    </div>
+<div id="chat-input-area">
+    <textarea id="chat-input"
+              placeholder="메시지를 입력하세요"></textarea>
+
+    <button id="send-btn" onclick="sendChat()">전송</button>
 </div>
 
 <!-- ══ 조사 종료 결과 팝업 ══ -->
@@ -332,6 +365,7 @@ function sendChat() {
     if (!val) return;
     socket.emit('msg_send', val);
     input.value = '';
+    input.style.height = '44px';
 }
 
 // ── GM 이미지 공유 ──
@@ -609,6 +643,7 @@ socket.on('kick_user', () => {
 
 // ── 초기화 ──
 window.onload = () => {
+
     loadProfileLocally();
 
     const roomTitle = localStorage.getItem('roomTitle');
@@ -620,8 +655,39 @@ window.onload = () => {
         document.getElementById('user-name').value = nick;
         const avatar = localStorage.getItem('myAvatar') || '';
         const bio = localStorage.getItem('myBio') || '';
-        socket.emit('rejoin_room', { title: roomTitle, name: nick, isSpectator: spec, avatar, bio });
+
+        socket.emit('rejoin_room', {
+            title: roomTitle,
+            name: nick,
+            isSpectator: spec,
+            avatar,
+            bio
+        });
     }
+
+    const chatInput = document.getElementById('chat-input');
+
+    chatInput.addEventListener('input', function() {
+
+        this.style.height = '44px';
+
+        this.style.height =
+            Math.min(this.scrollHeight, 120) + 'px';
+
+    });
+
+    chatInput.addEventListener('keydown', function(e){
+
+        if(e.key === 'Enter' && !e.shiftKey){
+
+            e.preventDefault();
+
+            sendChat();
+
+        }
+
+    });
+
 };
 
 setInterval(() => socket.emit('get_room_list'), 2000);
