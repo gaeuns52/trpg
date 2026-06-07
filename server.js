@@ -135,7 +135,7 @@ io.on('connection', (socket) => {
 
         const hpVal = Math.min(100, Math.max(0, parseInt(hp) || 0));
         const sanVal = Math.min(100, Math.max(0, parseInt(san) || 0));
-        if (hpVal + sanVal > 120) return socket.emit('system_alert', '체력+정신력 총합은 120 이하여야 합니다.');
+        
 
         room.characters[name] = { hp: hpVal, san: sanVal, avatar: avatar || '', bio: bio || '' };
 
