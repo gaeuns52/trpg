@@ -1,605 +1,394 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TRPG</title>
-<script src="/socket.io/socket.io.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-<style>
-:root {
-    --bg:#0e0e12; --surface:#16161c; --surface2:#1e1e27; --border:#2a2a38;
-    --accent:#c9a96e; --accent2:#7c6bff; --text:#e8e6df; --text2:#9995a0;
-    --danger:#ff5f6d; --success:#57c785;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
-.hidden{display:none!important;}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRPG</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f0f0; }
+        .hidden { display: none !important; }
 
-/* 로비 */
-#lobby{max-width:460px;margin:0 auto;padding:40px 24px;}
-.lobby-title{font-family:'Noto Serif KR',serif;font-size:28px;color:var(--accent);text-align:center;margin-bottom:8px;letter-spacing:2px;}
-.lobby-sub{text-align:center;color:var(--text2);font-size:13px;margin-bottom:32px;}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:16px;}
-.field-label{font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
-.field-row{display:flex;gap:12px;}
-.field-group{margin-bottom:14px;}
-input[type=text],input[type=number],input[type=password],textarea{
-    width:100%;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);
-    border-radius:10px;color:var(--text);font-size:14px;font-family:'Noto Sans KR',sans-serif;transition:border-color .2s;
-}
-input:focus,textarea:focus{outline:none;border-color:var(--accent);}
-textarea{resize:none;height:80px;}
-.btn{width:100%;padding:13px;border:none;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;transition:opacity .2s;}
-.btn:hover{opacity:.85;}
-.btn-gold{background:var(--accent);color:#1a1200;}
-.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2);}
-.section-heading{font-size:11px;color:var(--text2);letter-spacing:2px;text-transform:uppercase;margin:24px 0 12px;}
-.room-item{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;transition:border-color .2s;}
-.room-item:hover{border-color:var(--accent);}
-.room-name{font-weight:700;font-size:15px;}
-.room-meta{font-size:11px;color:var(--text2);margin-top:3px;}
-.join-btn{padding:8px 16px;background:var(--accent);color:#1a1200;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:13px;}
+        /* 로비 */
+        #lobby { max-width: 420px; margin: 40px auto; padding: 28px; background: #fff; border-radius: 24px; border: 1px solid #ddd; box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+        #lobby h2 { margin-bottom: 20px; font-size: 22px; }
+        .field-label { font-size: 13px; color: #555; margin-bottom: 4px; }
+        .field-group { margin-bottom: 14px; }
+        input[type=text], input[type=number], input[type=password] {
+            width: 100%; padding: 11px 14px; border: 1px solid #ddd; border-radius: 12px; background: #f9f9f9; font-size: 14px;
+        }
+        .btn { width: 100%; padding: 13px; border: none; border-radius: 12px; font-weight: bold; font-size: 15px; cursor: pointer; }
+        .btn-black { background: #000; color: #fff; }
+        .btn-black:hover { background: #222; }
 
-/* 게임룸 */
-#game-room{display:flex;height:100vh;max-width:1100px;margin:0 auto;}
-#sidebar{width:270px;min-width:270px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
-#main-area{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+        /* 방 목록 */
+        #room-list-container { margin-top: 16px; }
+        .room-item { margin-top: 10px; padding: 12px 14px; border: 1px solid #ddd; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .room-info { display: flex; flex-direction: column; gap: 3px; }
+        .room-title { font-weight: bold; font-size: 15px; }
+        .room-meta { font-size: 11px; color: #888; }
+        .join-btn { padding: 7px 14px; background: #000; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; }
 
-/* 사이드바 */
-.sidebar-header{padding:16px 18px;border-bottom:1px solid var(--border);}
-.sidebar-room-title{font-family:'Noto Serif KR',serif;font-size:16px;color:var(--accent);}
-.sidebar-location{font-size:12px;color:var(--text2);margin-top:3px;}
-.sidebar-scroll{flex:1;overflow-y:auto;padding:14px;}
-.sidebar-section{margin-bottom:20px;}
-.sidebar-label{font-size:10px;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;}
-.char-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer;transition:border-color .2s;display:flex;align-items:center;gap:10px;}
-.char-card:hover{border-color:var(--accent);}
-.char-avatar{width:40px;height:40px;border-radius:50%;background:var(--border);object-fit:cover;flex-shrink:0;border:2px solid var(--border);}
-.char-info{flex:1;min-width:0;}
-.char-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.char-stats{font-size:11px;color:var(--text2);margin-top:3px;}
-.stat-bar{height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden;}
-.stat-bar-fill-hp{height:100%;background:var(--success);border-radius:2px;transition:width .3s;}
-.stat-bar-fill-san{height:100%;background:var(--accent2);border-radius:2px;transition:width .3s;}
-.badge-gm{background:var(--accent);color:#1a1200;padding:1px 6px;border-radius:5px;font-size:9px;font-weight:700;margin-left:4px;}
-.item-tag{display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:12px;margin:2px;}
-#map-panel{border-top:1px solid var(--border);padding:12px;}
-#map-panel img{width:100%;border-radius:10px;cursor:pointer;}
-.map-empty{font-size:12px;color:var(--text2);text-align:center;padding:16px;}
+        /* 게임 룸 */
+        #game-room { display: flex; flex-direction: column; height: 100vh; max-width: 620px; margin: 0 auto; background: white; position: relative; }
+        .header { display: flex; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #eee; align-items: center; gap: 10px; }
+        .header-left { display: flex; flex-direction: column; gap: 2px; }
+        .header-location { font-weight: bold; font-size: 15px; }
+        .header-badge { font-size: 11px; color: #888; }
+        .spectator-badge { background: #f0f0f0; color: #555; padding: 3px 9px; border-radius: 20px; font-size: 12px; }
 
-/* 채팅 */
-.chat-header{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
-.chat-header-title{font-size:15px;font-weight:700;}
-.header-btns{display:flex;gap:8px;}
-.icon-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 12px;cursor:pointer;font-size:13px;transition:border-color .2s;}
-.icon-btn:hover{border-color:var(--accent);}
-#chat-box{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:10px;}
-.msg-system{text-align:center;color:var(--text2);font-size:12px;}
-.msg-system-bold{text-align:center;color:var(--accent);font-size:13px;font-weight:700;margin:4px 0;}
-.msg-img{text-align:center;margin:8px 0;}
-.msg-img img{max-width:85%;border-radius:12px;cursor:pointer;border:1px solid var(--border);}
-.msg-row{display:flex;flex-direction:column;max-width:70%;}
-.msg-row.me{align-self:flex-end;align-items:flex-end;}
-.msg-row.other{align-self:flex-start;align-items:flex-start;}
-.msg-sender{font-size:11px;color:var(--text2);margin-bottom:3px;display:flex;align-items:center;gap:6px;}
-.msg-sender-avatar{width:18px;height:18px;border-radius:50%;object-fit:cover;}
-.bubble{padding:10px 15px;border-radius:18px;font-size:14px;line-height:1.5;word-break:break-word;}
-.me .bubble{background:var(--accent);color:#1a1200;border-bottom-right-radius:4px;}
-.other .bubble{background:var(--surface2);color:var(--text);border-bottom-left-radius:4px;}
+        /* 채팅 */
+        #chat-box { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg-system { text-align: center; color: #999; font-size: 12px; padding: 2px 0; }
+        .msg-system-bold { text-align: center; color: #333; font-weight: bold; font-size: 13px; padding: 4px 0; }
+        .msg-container { display: flex; flex-direction: column; max-width: 75%; }
+        .msg-my { align-self: flex-end; align-items: flex-end; }
+        .msg-other { align-self: flex-start; align-items: flex-start; }
+        .msg-name { font-size: 11px; color: #888; margin-bottom: 3px; }
+        .chat-bubble { padding: 11px 15px; font-size: 14px; border-radius: 18px; line-height: 1.5; word-break: break-word; }
+        .msg-my .chat-bubble { background: #000; color: #fff; border-bottom-right-radius: 4px; }
+        .msg-other .chat-bubble { background: #e9e9eb; color: #000; border-bottom-left-radius: 4px; }
 
-/* 입력 */
-.chat-input-area{padding:12px 16px;border-top:1px solid var(--border);}
-.dice-row{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
-.dice-btn{padding:5px 12px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:20px;cursor:pointer;font-size:12px;transition:all .2s;}
-.dice-btn:hover{border-color:var(--accent2);color:var(--accent2);}
-.input-row{display:flex;gap:8px;}
-.input-row input{flex:1;height:44px;padding:0 16px;background:var(--surface2);border:1px solid var(--border);border-radius:22px;color:var(--text);font-size:14px;}
-.input-row input:disabled{opacity:.4;}
-.send-btn{width:68px;height:44px;background:var(--accent);color:#1a1200;border:none;border-radius:22px;font-weight:700;cursor:pointer;}
-.send-btn:disabled{background:var(--border);cursor:default;}
+        /* 입력창 */
+        .chat-input-row { display: flex; padding: 10px 14px; border-top: 1px solid #eee; gap: 8px; align-items: center; }
+        .chat-input-row input { flex: 1; height: 44px; padding: 0 15px; border: 1px solid #ddd; border-radius: 22px; font-size: 14px; }
+        .chat-input-row input:disabled { background: #f5f5f5; color: #aaa; }
+        #send-btn { width: 64px; height: 44px; background: #000; color: #fff; border: none; border-radius: 22px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        #send-btn:disabled { background: #ccc; cursor: default; }
 
-/* GM 패널 */
-#gm-panel{padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface);}
-.gm-label{font-size:11px;color:var(--text2);margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;}
-.gm-input-row{display:flex;gap:8px;align-items:center;}
-.gm-input-row input{flex:1;height:36px;padding:0 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;}
-.gm-send-btn{padding:0 14px;height:36px;background:var(--accent);color:#1a1200;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
-
-/* 관전자 바 */
-.spec-bar{background:var(--surface2);border-bottom:1px solid var(--border);padding:6px 20px;font-size:12px;color:var(--text2);text-align:center;}
-
-/* 모달 */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px;width:360px;max-width:90vw;max-height:90vh;overflow-y:auto;}
-.modal-title{font-family:'Noto Serif KR',serif;font-size:18px;color:var(--accent);margin-bottom:20px;}
-.modal-avatar-preview{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);margin:0 auto 16px;display:block;background:var(--surface2);}
-.modal-btns{display:flex;gap:10px;margin-top:20px;}
-.modal-btns .btn{flex:1;}
-.profile-avatar-big{width:100px;height:100px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);margin:0 auto 14px;display:block;background:var(--surface2);}
-.profile-name-big{text-align:center;font-size:20px;font-weight:700;margin-bottom:6px;}
-.profile-bio{color:var(--text2);font-size:13px;text-align:center;line-height:1.6;margin-bottom:16px;}
-.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
-.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;}
-.stat-box-label{font-size:11px;color:var(--text2);margin-bottom:4px;}
-.stat-box-val{font-size:22px;font-weight:700;color:var(--accent);}
-
-::-webkit-scrollbar{width:4px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
-@media(max-width:640px){#sidebar{display:none;}#game-room{max-width:100%;}}
-</style>
+        /* 메뉴 패널 */
+        #menu-panel { position: absolute; top: 60px; right: 10px; width: 250px; background: #fff; border-radius: 20px; padding: 18px; z-index: 10; box-shadow: 0 10px 30px rgba(0,0,0,0.12); border: 1px solid #eee; max-height: 80vh; overflow-y: auto; }
+        #admin-help { display: none; font-size: 12px; border-bottom: 1px solid #eee; margin-bottom: 12px; padding-bottom: 10px; line-height: 1.8; }
+        .section-title { font-weight: bold; font-size: 13px; margin-bottom: 6px; }
+        .char-card { background: #f9f9f9; border: 1px solid #ddd; border-radius: 12px; padding: 10px; margin-bottom: 8px; }
+        .char-name { font-weight: bold; font-size: 14px; }
+        .char-stats { font-size: 12px; color: #555; margin-top: 3px; }
+        .badge-admin { background: #000; color: #fff; padding: 2px 6px; border-radius: 6px; font-size: 10px; margin-left: 6px; }
+        .badge-spectator { background: #eee; color: #555; padding: 2px 6px; border-radius: 6px; font-size: 10px; margin-left: 6px; }
+        .leave-btn { width: 100%; padding: 10px; background: #f5f5f5; border: none; border-radius: 10px; cursor: pointer; font-size: 13px; margin-top: 10px; }
+        .leave-btn:hover { background: #eee; }
+    </style>
 </head>
 <body>
 
 <!-- 로비 -->
 <div id="lobby">
-    <div style="padding-top:40px;">
-        <div class="lobby-title">⚔ TRPG</div>
-        <div class="lobby-sub">어둠 속으로 들어가세요</div>
+    <h2>🎲 TRPG</h2>
+    <div class="field-group">
+        <div class="field-label">닉네임</div>
+        <input type="text" id="user-name" placeholder="닉네임 입력">
     </div>
-    <div class="card">
-        <div class="field-group">
-            <div class="field-label">닉네임</div>
-            <input type="text" id="user-name" placeholder="캐릭터 이름">
+    <div style="display:flex; gap:10px;">
+        <div class="field-group" style="flex:1">
+            <div class="field-label">체력</div>
+            <input type="number" id="init-hp" value="10" min="0" max="100">
         </div>
-        <div class="field-row">
-            <div class="field-group" style="flex:1">
-                <div class="field-label">체력</div>
-                <input type="number" id="init-hp" value="10" min="0" max="100">
-            </div>
-            <div class="field-group" style="flex:1">
-                <div class="field-label">정신력</div>
-                <input type="number" id="init-san" value="10" min="0" max="100">
-            </div>
+        <div class="field-group" style="flex:1">
+            <div class="field-label">정신력</div>
+            <input type="number" id="init-san" value="10" min="0" max="100">
         </div>
-        <div class="field-group">
-            <div class="field-label">방 제목</div>
-            <input type="text" id="new-room-title" placeholder="시나리오 제목">
-        </div>
-        <div class="field-group">
-            <div class="field-label">비밀번호 (없으면 공개방)</div>
-            <input type="password" id="new-room-pass" placeholder="선택사항">
-        </div>
-        <button class="btn btn-gold" onclick="createRoom()">방 생성</button>
     </div>
-    <div class="section-heading">열린 방 목록</div>
+    <div class="field-group">
+        <div class="field-label">방 제목</div>
+        <input type="text" id="new-room-title" placeholder="새 방 제목">
+    </div>
+    <div class="field-group">
+        <div class="field-label">비밀번호 (없으면 공개방)</div>
+        <input type="password" id="new-room-pass" placeholder="비밀번호 (선택)">
+    </div>
+    <button class="btn btn-black" onclick="createRoom()">방 생성</button>
     <div id="room-list-container"></div>
 </div>
 
-<!-- 게임룸 -->
+<!-- 게임 룸 -->
 <div id="game-room" class="hidden">
-    <div id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-room-title" id="sb-room-title">-</div>
-            <div class="sidebar-location">📍 <span id="sb-location">로비</span></div>
+    <div class="header">
+        <div class="header-left">
+            <div class="header-location">📍 <span id="map-box">로비</span></div>
+            <div class="header-badge" id="room-badge"></div>
         </div>
-        <div class="sidebar-scroll">
-            <div class="sidebar-section">
-                <div class="sidebar-label">참여자</div>
-                <div id="char-list"></div>
-            </div>
-            <div class="sidebar-section">
-                <div class="sidebar-label">아이템</div>
-                <div id="item-list-sb"><span style="color:var(--text2);font-size:12px;">없음</span></div>
-            </div>
-        </div>
-        <div id="map-panel">
-            <div class="sidebar-label" style="padding:0 2px 6px;">현재 지도</div>
-            <div id="map-img-wrap"><div class="map-empty">지도 없음</div></div>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <span id="spectator-badge" class="spectator-badge hidden"></span>
+            <div onclick="toggleMenu()" style="cursor:pointer; font-size:22px; padding:4px;">☰</div>
         </div>
     </div>
 
-    <div id="main-area">
-        <div id="spec-bar" class="spec-bar hidden">👁 관전 모드 — 채팅을 보낼 수 없습니다</div>
-
-        <div class="chat-header">
-            <div class="chat-header-title" id="chat-room-title">-</div>
-            <div class="header-btns">
-                <button class="icon-btn" id="profile-btn" onclick="openProfileModal()">👤 프로필</button>
-                <button class="icon-btn" onclick="leaveRoom()">나가기</button>
-            </div>
+    <div id="menu-panel" class="hidden">
+        <div id="admin-help">
+            <b>📋 기본 명령어</b><br>
+            /강퇴 [이름]<br>
+            /아이템 [이름] 획득<br>
+            /[n층]<br>
+            /[이름] 체력 [수치]<br>
+            /[이름] 정신력 [수치]<br>
+            /[이름] 룰렛<br>
+            /조사 종료<br><br>
+            <b>📊 구글 시트 명령어</b><br>
+            <span id="sheet-cmds"></span>
         </div>
-
-        <!-- GM 지도 공유 (이미지 URL 입력) -->
-        <div id="gm-panel" class="hidden">
-            <div class="gm-label">🗺️ 지도 / 사진 공유 (이미지 URL)</div>
-            <div class="gm-input-row">
-                <input type="text" id="map-url-input" placeholder="이미지 URL 붙여넣기 (예: https://...)">
-                <button class="gm-send-btn" onclick="shareMap()">공유</button>
-            </div>
+        <div class="section-title">👥 참여자</div>
+        <div id="character-container"></div>
+        <div style="margin-top:12px;">
+            <div class="section-title">📦 아이템</div>
+            <div id="item-list" style="font-size:13px; color:#444; margin-top:4px;">없음</div>
         </div>
-
-        <div id="chat-box"></div>
-
-        <div class="chat-input-area">
-            <div class="dice-row" id="dice-row"></div>
-            <div class="input-row">
-                <input type="text" id="chat-input" placeholder="메시지 입력..." onkeypress="if(event.keyCode==13)sendChat()">
-                <button class="send-btn" id="send-btn" onclick="sendChat()">전송</button>
-            </div>
-        </div>
+        <hr style="margin:12px 0; border:none; border-top:1px solid #eee;">
+        <button class="leave-btn" onclick="leaveRoom()">방 나가기</button>
     </div>
-</div>
 
-<!-- 프로필 설정 모달 -->
-<div id="profile-modal" class="modal-overlay hidden">
-    <div class="modal">
-        <div class="modal-title">캐릭터 프로필</div>
-        <img id="profile-preview" class="modal-avatar-preview" src="" onerror="this.src=''">
-        <div class="field-group">
-            <div class="field-label">프로필 사진 URL</div>
-            <input type="text" id="avatar-url-input" placeholder="이미지 URL 입력 (예: https://...)" oninput="previewAvatar(this.value)">
-            <div style="font-size:11px;color:var(--text2);margin-top:4px;">💡 Discord, imgur 등에서 이미지 링크를 복사해서 붙여넣으세요</div>
-        </div>
-        <div class="field-group" style="margin-top:12px;">
-            <div class="field-label">캐릭터 소개</div>
-            <textarea id="profile-bio" placeholder="캐릭터 소개를 입력하세요..."></textarea>
-        </div>
-        <div class="modal-btns">
-            <button class="btn btn-ghost" onclick="closeProfileModal()">취소</button>
-            <button class="btn btn-gold" onclick="saveProfile()">저장</button>
-        </div>
-    </div>
-</div>
+    <div id="chat-box"></div>
 
-<!-- 캐릭터 보기 모달 -->
-<div id="char-modal" class="modal-overlay hidden">
-    <div class="modal">
-        <img id="cm-avatar" class="profile-avatar-big" src="" onerror="this.style.visibility='hidden'">
-        <div class="profile-name-big" id="cm-name"></div>
-        <div class="profile-bio" id="cm-bio"></div>
-        <div class="stats-grid" id="cm-stats-grid"></div>
-        <div id="cm-dice-btns" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;"></div>
-        <button class="btn btn-ghost" onclick="closeCharModal()">닫기</button>
+    <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="메시지 입력..." onkeypress="if(event.keyCode==13) sendChat()">
+        <button id="send-btn" onclick="sendChat()">전송</button>
     </div>
 </div>
 
 <script>
-const socket = io();
-let myNick = "", isAdmin = false, amSpectator = false;
-let allCharacters = {}, roomCreatorName = "";
+    const socket = io();
 
-window.onload = () => {
-    const rt = localStorage.getItem('roomTitle');
-    const nick = localStorage.getItem('nick');
-    const spec = localStorage.getItem('isSpectator') === 'true';
-    if (rt && nick) {
-        myNick = nick;
-        document.getElementById('user-name').value = nick;
-        socket.emit('rejoin_room', { title: rt, name: nick, isSpectator: spec });
+    let myNick = "";
+    let isAdmin = false;
+    let amSpectator = false;
+
+    function escapeHtml(str) {
+        if (typeof str !== 'string') return '';
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
-};
 
-function leaveRoom() {
-    ['roomTitle','nick','isSpectator'].forEach(k => localStorage.removeItem(k));
-    location.reload();
-}
+    window.onload = () => {
+        const roomTitle = localStorage.getItem('roomTitle');
+        const nick = localStorage.getItem('nick');
+        const spectator = localStorage.getItem('isSpectator') === 'true';
+        if (roomTitle && nick) {
+            myNick = nick;
+            document.getElementById('user-name').value = nick;
+            socket.emit('rejoin_room', { title: roomTitle, name: nick, isSpectator: spectator });
+        }
+    };
 
-function createRoom() {
-    myNick = document.getElementById('user-name').value.trim();
-    const title = document.getElementById('new-room-title').value.trim();
-    const pass = document.getElementById('new-room-pass').value;
-    if (!myNick || !title) return alert("닉네임과 방 제목을 입력하세요!");
-    socket.emit('create_room', { title, password: pass, creatorName: myNick });
-    socket.once('create_success', t => joinRoom(t, pass));
-}
-
-function joinRoom(title, pass) {
-    myNick = document.getElementById('user-name').value.trim();
-    if (!myNick) return alert("닉네임을 먼저 입력하세요!");
-    socket.emit('join_room', { title, password: pass, name: myNick,
-        hp: document.getElementById('init-hp').value,
-        san: document.getElementById('init-san').value });
-}
-
-function handleJoinClick(title, hasPassword) {
-    myNick = document.getElementById('user-name').value.trim();
-    if (!myNick) return alert("닉네임을 먼저 입력하세요!");
-    if (hasPassword) {
-        const pass = prompt("비밀번호 입력:\n(빈칸으로 확인하면 관전자로 입장)");
-        if (pass === null) return;
-        joinRoom(title, pass);
-    } else {
-        joinRoom(title, "");
+    function toggleMenu() {
+        document.getElementById('menu-panel').classList.toggle('hidden');
     }
-}
 
-function sendChat() {
-    if (amSpectator) return;
-    const input = document.getElementById('chat-input');
-    const val = input.value.trim();
-    if (!val) return;
-    socket.emit('msg_send', val);
-    input.value = '';
-}
+    function leaveRoom() {
+        localStorage.removeItem('roomTitle');
+        localStorage.removeItem('nick');
+        localStorage.removeItem('isSpectator');
+        location.reload();
+    }
 
-function shareMap() {
-    const url = document.getElementById('map-url-input').value.trim();
-    if (!url) return alert('이미지 URL을 입력하세요.');
-    socket.emit('share_map', { imageUrl: url });
-    document.getElementById('map-url-input').value = '';
-}
+    function createRoom() {
+        myNick = document.getElementById('user-name').value.trim();
+        const title = document.getElementById('new-room-title').value.trim();
+        const pass = document.getElementById('new-room-pass').value;
+        if (!myNick || !title) return alert("닉네임과 방 제목을 입력하세요!");
+        socket.emit('create_room', { title, password: pass, creatorName: myNick });
+        socket.once('create_success', (t) => joinRoom(t, pass));
+    }
 
-function appendMsg({ sender, text, type }) {
-    const box = document.getElementById('chat-box');
-    if (type === 'system') {
-        const parts = text.split('|');
-        if (parts.length > 1) {
-            const d = document.createElement('div');
-            d.className = 'msg-system-bold';
-            d.textContent = parts[0].trim();
-            box.appendChild(d);
-            const wrap = document.createElement('div');
-            wrap.className = 'msg-img';
-            const img = document.createElement('img');
-            img.src = parts[1].trim();
-            img.onclick = () => window.open(parts[1].trim());
-            wrap.appendChild(img);
-            box.appendChild(wrap);
+    function joinRoom(title, pass) {
+        myNick = document.getElementById('user-name').value.trim();
+        if (!myNick) return alert("닉네임을 먼저 입력하세요!");
+        socket.emit('join_room', {
+            title,
+            password: pass,
+            name: myNick,
+            hp: document.getElementById('init-hp').value,
+            san: document.getElementById('init-san').value
+        });
+    }
+
+    function handleJoinClick(title, hasPassword) {
+        myNick = document.getElementById('user-name').value.trim();
+        if (!myNick) return alert("닉네임을 먼저 입력하세요!");
+
+        if (hasPassword) {
+            const pass = prompt("비밀번호를 입력하세요:\n(비밀번호 없이 확인하면 관전자로 입장합니다)");
+            if (pass === null) return;
+            joinRoom(title, pass);
         } else {
-            const d = document.createElement('div');
-            d.className = 'msg-system';
-            d.textContent = text;
-            box.appendChild(d);
+            joinRoom(title, "");
         }
-    } else {
-        const isMy = sender === myNick;
-        const char = allCharacters[sender];
-        const row = document.createElement('div');
-        row.className = `msg-row ${isMy ? 'me' : 'other'}`;
-        if (!isMy) {
-            const sr = document.createElement('div');
-            sr.className = 'msg-sender';
-            if (char?.avatar) {
-                const av = document.createElement('img');
-                av.src = char.avatar;
-                av.className = 'msg-sender-avatar';
-                sr.appendChild(av);
+    }
+
+    function sendChat() {
+        if (amSpectator) return;
+        const input = document.getElementById('chat-input');
+        const val = input.value.trim();
+        if (!val) return;
+        socket.emit('msg_send', val);
+        input.value = '';
+    }
+
+    function appendMessage({ sender, text, type }) {
+        const box = document.getElementById('chat-box');
+
+        if (type === 'system') {
+            const parts = text.split('|');
+            if (parts.length > 1) {
+                const textDiv = document.createElement('div');
+                textDiv.className = 'msg-system-bold';
+                textDiv.textContent = parts[0].trim();
+                box.appendChild(textDiv);
+
+                const imgUrl = parts[1].trim();
+                const imgDiv = document.createElement('div');
+                imgDiv.style.cssText = 'text-align:center; margin:8px 0;';
+                const img = document.createElement('img');
+                img.src = imgUrl;
+                img.style.cssText = 'max-width:90%; border-radius:10px; cursor:pointer;';
+                img.onclick = () => window.open(imgUrl);
+                imgDiv.appendChild(img);
+                box.appendChild(imgDiv);
+            } else {
+                const div = document.createElement('div');
+                div.className = 'msg-system';
+                div.textContent = text;
+                box.appendChild(div);
             }
-            const ns = document.createElement('span');
-            ns.textContent = sender;
-            sr.appendChild(ns);
-            row.appendChild(sr);
+        } else {
+            const isMy = (sender === myNick);
+            const container = document.createElement('div');
+            container.className = `msg-container ${isMy ? 'msg-my' : 'msg-other'}`;
+            const nameEl = document.createElement('div');
+            nameEl.className = 'msg-name';
+            nameEl.textContent = sender;
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.textContent = text;
+            container.appendChild(nameEl);
+            container.appendChild(bubble);
+            box.appendChild(container);
         }
-        const bubble = document.createElement('div');
-        bubble.className = 'bubble';
-        bubble.textContent = text;
-        row.appendChild(bubble);
-        box.appendChild(row);
-    }
-    box.scrollTop = box.scrollHeight;
-}
-
-function buildDiceRow() {
-    const row = document.getElementById('dice-row');
-    row.innerHTML = '';
-    if (amSpectator) return;
-    const char = allCharacters[myNick];
-    if (!char) return;
-    [{ label:`체력 판정 (${char.hp})`, stat:char.hp, name:'체력' },
-     { label:`정신력 판정 (${char.san})`, stat:char.san, name:'정신력' }].forEach(s => {
-        const btn = document.createElement('button');
-        btn.className = 'dice-btn';
-        btn.textContent = `🎲 ${s.label}`;
-        btn.onclick = () => socket.emit('roll_dice', { stat: s.stat, statName: `${myNick}의 ${s.name}` });
-        row.appendChild(btn);
-    });
-}
-
-// 프로필 모달
-function openProfileModal() {
-    const char = allCharacters[myNick];
-    document.getElementById('avatar-url-input').value = char?.avatar || '';
-    document.getElementById('profile-preview').src = char?.avatar || '';
-    document.getElementById('profile-bio').value = char?.profile || '';
-    document.getElementById('profile-modal').classList.remove('hidden');
-}
-function closeProfileModal() { document.getElementById('profile-modal').classList.add('hidden'); }
-function previewAvatar(url) { document.getElementById('profile-preview').src = url; }
-function saveProfile() {
-    const avatar = document.getElementById('avatar-url-input').value.trim();
-    const bio = document.getElementById('profile-bio').value;
-    socket.emit('update_profile', { profile: bio, avatar });
-    closeProfileModal();
-}
-
-// 캐릭터 보기 모달
-function openCharModal(name) {
-    const char = allCharacters[name];
-    if (!char) return;
-    const isCreator = name === roomCreatorName;
-    document.getElementById('cm-avatar').src = char.avatar || '';
-    document.getElementById('cm-name').textContent = name + (isCreator ? ' (GM)' : '');
-    document.getElementById('cm-bio').textContent = char.profile || '소개 없음';
-
-    const sg = document.getElementById('cm-stats-grid');
-    sg.innerHTML = '';
-    if (!isCreator) {
-        [{ label:'체력', val: char.hp }, { label:'정신력', val: char.san }].forEach(s => {
-            const box = document.createElement('div');
-            box.className = 'stat-box';
-            box.innerHTML = `<div class="stat-box-label">${s.label}</div><div class="stat-box-val">${s.val}</div>`;
-            sg.appendChild(box);
-        });
+        box.scrollTop = box.scrollHeight;
     }
 
-    const dw = document.getElementById('cm-dice-btns');
-    dw.innerHTML = '';
-    if (!isCreator && isAdmin) {
-        [{ label:`체력(${char.hp})`, stat:char.hp, sname:'체력' },
-         { label:`정신력(${char.san})`, stat:char.san, sname:'정신력' }].forEach(s => {
-            const b = document.createElement('button');
-            b.className = 'dice-btn';
-            b.textContent = `🎲 ${s.label} 판정`;
-            b.onclick = () => { socket.emit('roll_dice', { stat: s.stat, statName: `${name}의 ${s.sname}` }); closeCharModal(); };
-            dw.appendChild(b);
-        });
-    }
-    document.getElementById('char-modal').classList.remove('hidden');
-}
-function closeCharModal() { document.getElementById('char-modal').classList.add('hidden'); }
+    // 소켓 이벤트
+    socket.on('join_success', (data) => {
+        localStorage.setItem('roomTitle', data.title);
+        localStorage.setItem('nick', myNick);
+        localStorage.setItem('isSpectator', data.isSpectator);
 
-// 소켓 이벤트
-socket.on('join_success', data => {
-    localStorage.setItem('roomTitle', data.title);
-    localStorage.setItem('nick', myNick);
-    localStorage.setItem('isSpectator', data.isSpectator);
-    isAdmin = data.isAdmin;
-    amSpectator = data.isSpectator;
-    document.getElementById('lobby').classList.add('hidden');
-    document.getElementById('game-room').classList.remove('hidden');
-    document.getElementById('sb-room-title').textContent = data.title;
-    document.getElementById('chat-room-title').textContent = data.title;
-    if (amSpectator) {
-        document.getElementById('spec-bar').classList.remove('hidden');
-        document.getElementById('profile-btn').classList.add('hidden');
-        document.getElementById('chat-input').disabled = true;
-        document.getElementById('chat-input').placeholder = '관전자는 채팅 불가';
-        document.getElementById('send-btn').disabled = true;
-    }
-    if (isAdmin) document.getElementById('gm-panel').classList.remove('hidden');
-});
+        isAdmin = data.isAdmin;
+        amSpectator = data.isSpectator;
 
-socket.on('msg_receive', data => appendMsg(data));
+        document.getElementById('lobby').classList.add('hidden');
+        document.getElementById('game-room').classList.remove('hidden');
+        document.getElementById('room-badge').textContent = data.title;
 
-socket.on('update_data', ({ characters, items, mapInfo, creatorName, spectatorCount, currentMap }) => {
-    allCharacters = characters;
-    roomCreatorName = creatorName;
-    document.getElementById('sb-location').textContent = mapInfo;
-
-    // 캐릭터 목록
-    const cl = document.getElementById('char-list');
-    cl.innerHTML = '';
-    Object.entries(characters).forEach(([name, data]) => {
-        const isCreator = name === creatorName;
-        const card = document.createElement('div');
-        card.className = 'char-card';
-        card.onclick = () => openCharModal(name);
-
-        const av = document.createElement('img');
-        av.className = 'char-avatar';
-        av.src = data.avatar || '';
-
-        const info = document.createElement('div');
-        info.className = 'char-info';
-        const nameRow = document.createElement('div');
-        nameRow.className = 'char-name';
-        nameRow.textContent = name;
-        if (isCreator) {
-            const b = document.createElement('span');
-            b.className = 'badge-gm';
-            b.textContent = 'GM';
-            nameRow.appendChild(b);
+        if (amSpectator) {
+            document.getElementById('spectator-badge').textContent = '👁 관전 중';
+            document.getElementById('spectator-badge').classList.remove('hidden');
+            document.getElementById('chat-input').disabled = true;
+            document.getElementById('chat-input').placeholder = '관전자는 채팅을 보낼 수 없습니다';
+            document.getElementById('send-btn').disabled = true;
         }
-        info.appendChild(nameRow);
-
-        if (!isCreator) {
-            const stats = document.createElement('div');
-            stats.className = 'char-stats';
-            stats.textContent = `HP ${data.hp}  SAN ${data.san}`;
-            info.appendChild(stats);
-
-            const hpBar = document.createElement('div');
-            hpBar.className = 'stat-bar';
-            const hpFill = document.createElement('div');
-            hpFill.className = 'stat-bar-fill-hp';
-            hpFill.style.width = data.hp + '%';
-            hpBar.appendChild(hpFill);
-            info.appendChild(hpBar);
-
-            const sanBar = document.createElement('div');
-            sanBar.className = 'stat-bar';
-            const sanFill = document.createElement('div');
-            sanFill.className = 'stat-bar-fill-san';
-            sanFill.style.width = data.san + '%';
-            sanBar.appendChild(sanFill);
-            info.appendChild(sanBar);
-        }
-
-        card.appendChild(av);
-        card.appendChild(info);
-        cl.appendChild(card);
     });
 
-    if (spectatorCount > 0) {
-        const sp = document.createElement('div');
-        sp.style.cssText = 'font-size:11px;color:var(--text2);margin-top:6px;';
-        sp.textContent = `👁 관전자 ${spectatorCount}명`;
-        cl.appendChild(sp);
-    }
-
-    // 아이템
-    const il = document.getElementById('item-list-sb');
-    il.innerHTML = '';
-    if (!items.length) {
-        il.innerHTML = '<span style="color:var(--text2);font-size:12px;">없음</span>';
-    } else {
-        items.forEach(i => {
-            const tag = document.createElement('span');
-            tag.className = 'item-tag';
-            tag.textContent = i.name;
-            il.appendChild(tag);
-        });
-    }
-
-    // 지도
-    const mw = document.getElementById('map-img-wrap');
-    if (currentMap) {
-        mw.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = currentMap;
-        img.onclick = () => window.open(currentMap);
-        mw.appendChild(img);
-    } else {
-        mw.innerHTML = '<div class="map-empty">지도 없음</div>';
-    }
-
-    buildDiceRow();
-});
-
-socket.on('room_list', list => {
-    const c = document.getElementById('room-list-container');
-    c.innerHTML = '';
-    if (!list.length) {
-        c.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:20px;">생성된 방이 없습니다</div>';
-        return;
-    }
-    list.forEach(r => {
-        const div = document.createElement('div');
-        div.className = 'room-item';
-        const info = document.createElement('div');
-        const name = document.createElement('div');
-        name.className = 'room-name';
-        name.textContent = r.title + (r.hasPassword ? ' 🔒' : '');
-        const meta = document.createElement('div');
-        meta.className = 'room-meta';
-        meta.textContent = `플레이어 ${r.playerCount}명 · 관전자 ${r.spectatorCount}명`;
-        info.appendChild(name);
-        info.appendChild(meta);
-        const btn = document.createElement('button');
-        btn.className = 'join-btn';
-        btn.textContent = '입장';
-        btn.onclick = () => handleJoinClick(r.title, r.hasPassword);
-        div.appendChild(info);
-        div.appendChild(btn);
-        c.appendChild(div);
+    socket.on('update_commands', (cmds) => {
+        if (!isAdmin) return;
+        const sheetHelp = document.getElementById('sheet-cmds');
+        sheetHelp.textContent = cmds.map(c => c.cmd).join('\n');
+        sheetHelp.style.whiteSpace = 'pre';
+        document.getElementById('admin-help').style.display = 'block';
     });
-});
 
-socket.on('system_alert', msg => alert(msg));
-socket.on('room_closed', () => {
-    ['roomTitle','nick','isSpectator'].forEach(k => localStorage.removeItem(k));
-    alert('방장이 퇴장하여 방이 종료되었습니다.');
-    location.reload();
-});
-socket.on('kick_user', () => {
-    ['roomTitle','nick','isSpectator'].forEach(k => localStorage.removeItem(k));
-    alert('강퇴되었습니다.');
-    location.reload();
-});
+    socket.on('msg_receive', (data) => appendMessage(data));
 
-setInterval(() => socket.emit('get_room_list'), 2000);
+    socket.on('update_data', ({ characters, items, mapInfo, creatorName, spectatorCount }) => {
+        document.getElementById('map-box').textContent = mapInfo;
+
+        const container = document.getElementById('character-container');
+        container.innerHTML = '';
+        Object.entries(characters).forEach(([name, data]) => {
+            const isCreator = (name === creatorName);
+            const card = document.createElement('div');
+            card.className = 'char-card';
+
+            const nameRow = document.createElement('div');
+            nameRow.className = 'char-name';
+            nameRow.textContent = name;
+            if (isCreator) {
+                const badge = document.createElement('span');
+                badge.className = 'badge-admin';
+                badge.textContent = '방장';
+                nameRow.appendChild(badge);
+            }
+            card.appendChild(nameRow);
+
+            if (!isCreator) {
+                const stats = document.createElement('div');
+                stats.className = 'char-stats';
+                stats.textContent = `체력 ${data.hp} / 정신력 ${data.san}`;
+                card.appendChild(stats);
+            }
+            container.appendChild(card);
+        });
+
+        if (spectatorCount > 0) {
+            const spec = document.createElement('div');
+            spec.style.cssText = 'font-size:12px; color:#888; margin-top:4px;';
+            spec.textContent = `👁 관전자 ${spectatorCount}명`;
+            container.appendChild(spec);
+        }
+
+        document.getElementById('item-list').textContent = items.map(i => i.name).join(', ') || '없음';
+    });
+
+    socket.on('room_list', (list) => {
+        const container = document.getElementById('room-list-container');
+        container.innerHTML = '';
+        if (list.length === 0) {
+            container.innerHTML = '<div style="text-align:center; color:#aaa; font-size:13px; margin-top:16px;">생성된 방이 없습니다</div>';
+            return;
+        }
+        list.forEach(r => {
+            const div = document.createElement('div');
+            div.className = 'room-item';
+
+            const info = document.createElement('div');
+            info.className = 'room-info';
+            const title = document.createElement('div');
+            title.className = 'room-title';
+            title.textContent = r.title + (r.hasPassword ? ' 🔒' : '');
+            const meta = document.createElement('div');
+            meta.className = 'room-meta';
+            meta.textContent = `플레이어 ${r.playerCount}명 · 관전자 ${r.spectatorCount}명`;
+            info.appendChild(title);
+            info.appendChild(meta);
+
+            const btn = document.createElement('button');
+            btn.className = 'join-btn';
+            btn.textContent = '입장';
+            btn.onclick = () => handleJoinClick(r.title, r.hasPassword);
+
+            div.appendChild(info);
+            div.appendChild(btn);
+            container.appendChild(div);
+        });
+    });
+
+    socket.on('system_alert', (msg) => alert(msg));
+
+    socket.on('room_closed', () => {
+        localStorage.removeItem('roomTitle');
+        localStorage.removeItem('nick');
+        localStorage.removeItem('isSpectator');
+        alert('방장이 퇴장하여 방이 종료되었습니다.');
+        location.reload();
+    });
+
+    socket.on('kick_user', () => {
+        localStorage.removeItem('roomTitle');
+        localStorage.removeItem('nick');
+        localStorage.removeItem('isSpectator');
+        alert('강퇴되었습니다.');
+        location.reload();
+    });
+
+    setInterval(() => socket.emit('get_room_list'), 2000);
 </script>
 </body>
 </html>
