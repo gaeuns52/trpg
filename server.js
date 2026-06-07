@@ -12,7 +12,6 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 let rooms = {};
 let users = {};
-
 let cachedCommands = [];
 let lastFetched = 0;
 
@@ -27,9 +26,7 @@ async function getCommandListFromSheet() {
         cachedCommands = data.table.rows.map(row => ({ cmd: row.c[0]?.v || "", text: row.c[1]?.v || "" })).filter(r => r.cmd);
         lastFetched = now;
         return cachedCommands;
-    } catch (e) {
-        return cachedCommands;
-    }
+    } catch (e) { return cachedCommands; }
 }
 
 function broadcastRoomData(roomTitle) {
@@ -40,7 +37,8 @@ function broadcastRoomData(roomTitle) {
         items: room.items,
         mapInfo: room.mapInfo,
         creatorName: room.creatorName,
-        spectatorCount: room.spectators ? room.spectators.length : 0
+        spectatorCount: room.spectators ? room.spectators.length : 0,
+        currentMap: room.currentMap || null
     });
 }
 
@@ -59,27 +57,23 @@ io.on('connection', (socket) => {
     socket.on('create_room', ({ title, password, creatorName }) => {
         if (!title || !title.trim()) return socket.emit('system_alert', '방 제목을 입력해주세요.');
         if (rooms[title]) return socket.emit('system_alert', '이미 존재하는 방입니다.');
-        rooms[title] = { password: password || "", creatorName, items: [], characters: {}, mapInfo: "로비", spectators: [] };
+        rooms[title] = { password: password || "", creatorName, items: [], characters: {}, mapInfo: "로비", spectators: [], currentMap: null };
         socket.emit('create_success', title);
     });
 
     socket.on('rejoin_room', async ({ title, name, isSpectator }) => {
         const room = rooms[title];
         if (!room) return socket.emit('system_alert', '방이 사라졌습니다. 다시 입장해주세요.');
-
         const existingId = Object.keys(users).find(id => users[id].roomTitle === title && users[id].name === name);
         if (existingId && existingId !== socket.id) delete users[existingId];
-
         socket.join(title);
         users[socket.id] = { roomTitle: title, name, isSpectator: isSpectator || false };
-
         if (isSpectator) {
             if (!room.spectators) room.spectators = [];
             if (!room.spectators.includes(name)) room.spectators.push(name);
         } else {
-            if (!room.characters[name]) room.characters[name] = { hp: 10, san: 10 };
+            if (!room.characters[name]) room.characters[name] = { hp: 10, san: 10, profile: '', avatar: '' };
         }
-
         const isAdmin = room.creatorName === name;
         const commands = await getCommandListFromSheet();
         socket.emit('join_success', { title, isAdmin, isSpectator: isSpectator || false });
@@ -91,13 +85,9 @@ io.on('connection', (socket) => {
         const room = rooms[title];
         if (!room) return socket.emit('system_alert', '방이 없습니다.');
         if (!name || !name.trim()) return socket.emit('system_alert', '닉네임을 입력해주세요.');
-
         const isSpectator = (room.password !== "" && password === "");
-
-        if (!isSpectator && room.password !== "" && room.password !== password) {
+        if (!isSpectator && room.password !== "" && room.password !== password)
             return socket.emit('system_alert', '비밀번호가 틀렸습니다.');
-        }
-
         const existingId = Object.keys(users).find(id => users[id].roomTitle === title && users[id].name === name);
         if (existingId && existingId !== socket.id) return socket.emit('system_alert', '이미 사용 중인 닉네임입니다.');
 
@@ -112,16 +102,13 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const hpValue = parseInt(hp) || 0;
-        const sanValue = parseInt(san) || 0;
-        if (hpValue < 0 || hpValue > 100 || sanValue < 0 || sanValue > 100 || hpValue + sanValue > 120) {
-            return socket.emit('system_alert', '체력과 정신력은 각각 0~100, 총합은 120 이하여야 합니다.');
-        }
+        const hpValue = Math.min(100, Math.max(0, parseInt(hp) || 0));
+        const sanValue = Math.min(100, Math.max(0, parseInt(san) || 0));
+        if (hpValue + sanValue > 120) return socket.emit('system_alert', '체력+정신력 총합은 120 이하여야 합니다.');
 
         socket.join(title);
         users[socket.id] = { roomTitle: title, name, isSpectator: false };
-        room.characters[name] = { hp: hpValue, san: sanValue };
-
+        room.characters[name] = { hp: hpValue, san: sanValue, profile: '', avatar: '' };
         const isAdmin = room.creatorName === name;
         const commands = await getCommandListFromSheet();
         socket.emit('join_success', { title, isAdmin, isSpectator: false });
@@ -130,14 +117,50 @@ io.on('connection', (socket) => {
         broadcastRoomData(title);
     });
 
+    socket.on('update_profile', ({ profile, avatar }) => {
+        const user = users[socket.id];
+        if (!user || user.isSpectator) return;
+        const room = rooms[user.roomTitle];
+        if (!room || !room.characters[user.name]) return;
+        if (profile !== undefined) room.characters[user.name].profile = profile;
+        if (avatar !== undefined) room.characters[user.name].avatar = avatar;
+        broadcastRoomData(user.roomTitle);
+    });
+
+    socket.on('share_map', ({ imageUrl }) => {
+        const user = users[socket.id];
+        if (!user) return;
+        const room = rooms[user.roomTitle];
+        if (!room || room.creatorName !== user.name) return;
+        room.currentMap = imageUrl;
+        io.to(user.roomTitle).emit('msg_receive', {
+            sender: '시스템',
+            text: `🗺️ GM이 지도를 공유했습니다.|${imageUrl}`,
+            type: 'system'
+        });
+        broadcastRoomData(user.roomTitle);
+    });
+
+    socket.on('roll_dice', ({ stat, statName }) => {
+        const user = users[socket.id];
+        if (!user || user.isSpectator) return;
+        const room = rooms[user.roomTitle];
+        if (!room) return;
+        const roll = Math.floor(Math.random() * 100) + 1;
+        const result = roll <= Math.floor(stat / 5) ? '💥 대성공' : roll <= stat ? '✅ 성공' : roll >= 96 ? '💀 대실패' : '❌ 실패';
+        io.to(user.roomTitle).emit('msg_receive', {
+            sender: '시스템',
+            text: `🎲 ${statName} 판정: ${roll} / ${stat} → ${result}`,
+            type: 'system'
+        });
+    });
+
     socket.on('msg_send', async (text) => {
         const user = users[socket.id];
         if (!user) return;
         const room = rooms[user.roomTitle];
         if (!room) return;
-
         if (user.isSpectator) return socket.emit('system_alert', '관전자는 채팅을 보낼 수 없습니다.');
-
         const isAdmin = room.creatorName === user.name;
 
         if (text.startsWith('/')) {
@@ -157,7 +180,7 @@ io.on('connection', (socket) => {
             else if (cmd === '아이템') {
                 const itemName = parts.slice(1).filter(p => p !== '획득').join(' ');
                 if (!itemName) return socket.emit('system_alert', '아이템 이름을 입력해주세요.');
-                room.items.push({ name: itemName, count: 1 });
+                room.items.push({ name: itemName });
                 io.to(user.roomTitle).emit('msg_receive', { sender: '시스템', text: `[아이템] ${itemName} 획득`, type: 'system' });
                 broadcastRoomData(user.roomTitle);
             }
@@ -169,11 +192,7 @@ io.on('connection', (socket) => {
             else if (cmd === '조사' && parts[1] === '종료') {
                 const participants = Object.entries(room.characters).filter(([n]) => n !== room.creatorName);
                 const summary = participants.map(([n, d]) => `${n}: 체력${d.hp}/정신력${d.san}`).join(' | ');
-                io.to(user.roomTitle).emit('msg_receive', {
-                    sender: '시스템',
-                    text: summary === '' ? '[조사 종료] 참여자 없음' : `[조사 종료] ${summary}`,
-                    type: 'system'
-                });
+                io.to(user.roomTitle).emit('msg_receive', { sender: '시스템', text: summary || '[조사 종료] 참여자 없음', type: 'system' });
             }
             else if (room.characters[cmd]) {
                 const target = cmd;
@@ -183,14 +202,6 @@ io.on('connection', (socket) => {
                     room.characters[target][stat] = Math.max(0, Math.min(100, room.characters[target][stat] + amount));
                     io.to(user.roomTitle).emit('msg_receive', { sender: '시스템', text: `[스탯] ${target}의 ${parts[1]}: ${room.characters[target][stat]}`, type: 'system' });
                     broadcastRoomData(user.roomTitle);
-                } else if (parts[1] === '룰렛') {
-                    const roll = Math.floor(Math.random() * 100);
-                    const success = roll < room.characters[target].san;
-                    io.to(user.roomTitle).emit('msg_receive', {
-                        sender: '시스템',
-                        text: `${target} 룰렛: ${success ? '✅ 성공' : '❌ 실패'} (${roll} / 기준 ${room.characters[target].san})`,
-                        type: 'system'
-                    });
                 }
             }
             else {
