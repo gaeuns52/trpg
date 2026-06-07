@@ -297,12 +297,14 @@ function updateAvatarPreview() {
 }
 
 function saveProfileLocally() {
-    const nick =
-        document.getElementById('user-name').value.trim();
+    const nick = document.getElementById('user-name').value.trim();
     const avatar = document.getElementById('profile-avatar-url').value.trim();
     const bio = document.getElementById('profile-bio-input').value.trim();
+
+    localStorage.setItem('savedNick', nick);
     localStorage.setItem('myAvatar', avatar);
     localStorage.setItem('myBio', bio);
+
     const msg = document.getElementById('profile-save-msg');
     msg.style.display = 'block';
     setTimeout(() => msg.style.display = 'none', 2000);
@@ -313,6 +315,7 @@ function loadProfileLocally() {
         localStorage.getItem('savedNick') || '';
     const avatar = localStorage.getItem('myAvatar') || '';
     const bio = localStorage.getItem('myBio') || '';
+    document.getElementById('user-name').value = nick;
     document.getElementById('profile-avatar-url').value = avatar;
     document.getElementById('profile-bio-input').value = bio;
     document.getElementById('lobby-avatar-preview').src = avatar;
@@ -659,8 +662,9 @@ window.onload = () => {
     const nick = localStorage.getItem('nick');
     const spec = localStorage.getItem('isSpectator') === 'true';
 
-    if(savedNick){
-    document.getElementById('user-name').value = savedNick;
+    if (savedNick) {
+        document.getElementById('user-name').value = savedNick;
+    }
 
     if (roomTitle && nick) {
         myNick = nick;
