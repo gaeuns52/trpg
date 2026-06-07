@@ -337,9 +337,12 @@ function leaveRoom() {
 // ── 방 생성 / 입장 ──
 function createRoom() {
     myNick = document.getElementById('user-name').value.trim();
+    const nick = localStorage.getItem('savedNick');
     const title = document.getElementById('new-room-title').value.trim();
     const pass = document.getElementById('new-room-pass').value;
-    if (!myNick || !title) return alert("닉네임과 방 제목을 입력하세요!");
+    if (!nick)
+    return alert("프로필 설정에서 닉네임을 먼저 입력해주세요.");
+    if (!myNick || !title) return alert("방 제목을 입력하세요!");
     socket.emit('create_room', { title, password: pass, creatorName: myNick });
     socket.once('create_success', (t) => joinRoom(t, pass));
 }
