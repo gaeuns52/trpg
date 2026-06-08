@@ -6,6 +6,7 @@ const axios = require('axios');
 const path = require('path');
 
 const GOOGLE_SHEET_ID = '1rbqlvNFfiGKwNSsSKuekgTs-j5qLevctBvyv7fPqIh8';
+const GM_CREATE_PASS = process.env.GM_PASS || 'gm1234'; // 서버 환경변수 GM_PASS로 변경 가능
 
 app.use(express.static(__dirname));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -56,6 +57,8 @@ io.on('connection', (socket) => {
 
     socket.on('create_room', ({ title, password, creatorName, createPass }) => {
         if (!title?.trim()) return socket.emit('system_alert', '방 제목을 입력하세요.');
+        if (!creatorName?.trim()) return socket.emit('system_alert', '닉네임을 입력하세요.');
+        if (createPass !== GM_CREATE_PASS) return socket.emit('system_alert', '❌ GM 비밀번호가 틀렸습니다.');
         if (rooms[title]) return socket.emit('system_alert', '이미 존재하는 방입니다.');
         rooms[title] = {
             password: password || '',

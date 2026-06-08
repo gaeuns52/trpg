@@ -171,7 +171,8 @@
 
     <!-- 방 입장 탭 -->
     <div id="tab-room" class="tab-content active">
-        
+        <div class="field-label">닉네임</div>
+        <input type="text" id="user-name-room" placeholder="닉네임" oninput="syncNick(this.value)">
         <div class="field-label">체력</div>
         <input type="number" id="init-hp" value="10">
         <div class="field-label">정신력</div>
@@ -190,7 +191,7 @@
     <div id="tab-profile" class="tab-content">
         <img id="lobby-avatar-preview" class="avatar-preview" src="" onerror="this.src=''">
         <div class="field-label">닉네임</div>
-        <input type="text" id="user-name" placeholder="닉네임">
+        <input type="text" id="user-name" placeholder="닉네임" oninput="syncNick(this.value)">
         <div class="field-label">프로필 사진 URL</div>
         <input type="text" id="profile-avatar-url" placeholder="이미지 URL (Discord, imgur 등)" oninput="updateAvatarPreview()">
         <div style="font-size:11px; color:#aaa; margin-top:-10px; margin-bottom:14px;">💡 Discord에서 이미지 우클릭 → 링크 복사</div>
@@ -284,7 +285,12 @@ let lastSender = null; // 연속 메시지 추적
 let visitedLocations = []; // 조사 중 이동 장소 기록
 let sessionItems = []; // 조사 중 획득 아이템
 
-// ── 탭 전환 ──
+// ── 닉네임 동기화 (방 입장 탭 ↔ 프로필 탭) ──
+function syncNick(val) {
+    document.getElementById('user-name').value = val;
+    document.getElementById('user-name-room').value = val;
+    localStorage.setItem('savedNick', val);
+}
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.lobby-tab').forEach(t => t.classList.remove('active'));
@@ -313,11 +319,11 @@ function saveProfileLocally() {
 }
 
 function loadProfileLocally() {
-    const nick =
-        localStorage.getItem('savedNick') || '';
+    const nick = localStorage.getItem('savedNick') || '';
     const avatar = localStorage.getItem('myAvatar') || '';
     const bio = localStorage.getItem('myBio') || '';
     document.getElementById('user-name').value = nick;
+    document.getElementById('user-name-room').value = nick;
     document.getElementById('profile-avatar-url').value = avatar;
     document.getElementById('profile-bio-input').value = bio;
     document.getElementById('lobby-avatar-preview').src = avatar;
@@ -338,27 +344,26 @@ function leaveRoom() {
 
 // ── 방 생성 / 입장 ──
 function createRoom() {
-    myNick = document.getElementById('user-name').value.trim();
-    const nick = localStorage.getItem('savedNick');
+    myNick = document.getElementById('user-name-room').value.trim() || document.getElementById('user-name').value.trim();
     const title = document.getElementById('new-room-title').value.trim();
     const pass = document.getElementById('new-room-pass').value;
-    const createPass =
-    document.getElementById('create-pass').value;
-    if (!nick)
-    return alert("프로필 설정에서 닉네임을 먼저 입력해주세요.");
-    if (!myNick || !title) return alert("방 제목을 입력하세요!");
+    const createPass = document.getElementById('create-pass').value;
+    if (!myNick) return alert("닉네임을 먼저 입력하세요!");
+    if (!title) return alert("방 제목을 입력하세요!");
+    localStorage.setItem('savedNick', myNick);
     socket.emit('create_room', {
-    title,
-    password: pass,
-    creatorName: myNick,
-    createPass
-});
+        title,
+        password: pass,
+        creatorName: myNick,
+        createPass
+    });
     socket.once('create_success', (t) => joinRoom(t, pass));
 }
 
 function joinRoom(title, pass) {
-    myNick = document.getElementById('user-name').value.trim();
+    myNick = document.getElementById('user-name-room').value.trim() || document.getElementById('user-name').value.trim();
     if (!myNick) return alert("닉네임을 먼저 입력하세요!");
+    localStorage.setItem('savedNick', myNick);
     const avatar = localStorage.getItem('myAvatar') || '';
     const bio = localStorage.getItem('myBio') || '';
     socket.emit('join_room', {
@@ -370,7 +375,7 @@ function joinRoom(title, pass) {
 }
 
 function handleJoinClick(title, hasPassword) {
-    myNick = document.getElementById('user-name').value.trim();
+    myNick = document.getElementById('user-name-room').value.trim() || document.getElementById('user-name').value.trim();
     if (!myNick) return alert("닉네임을 먼저 입력하세요!");
     if (hasPassword) {
         const pass = prompt("비밀번호를 입력하세요:\n(빈칸으로 확인하면 관전자로 입장)");
@@ -669,18 +674,13 @@ window.onload = () => {
     loadProfileLocally();
 
     const roomTitle = localStorage.getItem('roomTitle');
-    const savedNick =
-    localStorage.getItem('savedNick');
     const nick = localStorage.getItem('nick');
     const spec = localStorage.getItem('isSpectator') === 'true';
-
-    if (savedNick) {
-        document.getElementById('user-name').value = savedNick;
-    }
 
     if (roomTitle && nick) {
         myNick = nick;
         document.getElementById('user-name').value = nick;
+        document.getElementById('user-name-room').value = nick;
         const avatar = localStorage.getItem('myAvatar') || '';
         const bio = localStorage.getItem('myBio') || '';
 
