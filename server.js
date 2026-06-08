@@ -54,7 +54,7 @@ io.on('connection', (socket) => {
         })));
     });
 
-    socket.on('create_room', ({ title, password, creatorName }) => {
+    socket.on('create_room', ({ title, password, creatorName, createPass }) => {
         if (!title?.trim()) return socket.emit('system_alert', '방 제목을 입력하세요.');
         if (rooms[title]) return socket.emit('system_alert', '이미 존재하는 방입니다.');
         rooms[title] = {
