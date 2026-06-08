@@ -180,6 +180,8 @@
         <input type="text" id="new-room-title" placeholder="새 방 제목">
         <div class="field-label">비밀번호</div>
         <input type="password" id="new-room-pass" placeholder="없으면 공개방">
+        <div class="field-label">방 생성 비밀번호</div>
+        <input type="password" id="create-pass" placeholder="GM 비밀번호">
         <button class="btn-create" onclick="createRoom()">방 생성</button>
         <div id="room-list-container" style="margin-top:16px;"></div>
     </div>
@@ -340,10 +342,17 @@ function createRoom() {
     const nick = localStorage.getItem('savedNick');
     const title = document.getElementById('new-room-title').value.trim();
     const pass = document.getElementById('new-room-pass').value;
+    const createPass =
+    document.getElementById('create-pass').value;
     if (!nick)
     return alert("프로필 설정에서 닉네임을 먼저 입력해주세요.");
     if (!myNick || !title) return alert("방 제목을 입력하세요!");
-    socket.emit('create_room', { title, password: pass, creatorName: myNick });
+    socket.emit('create_room', {
+    title,
+    password: pass,
+    creatorName: myNick,
+    createPass
+});
     socket.once('create_success', (t) => joinRoom(t, pass));
 }
 
